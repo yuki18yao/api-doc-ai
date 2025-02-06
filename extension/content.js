@@ -5,13 +5,15 @@ function createChatWidget() {
     widget.innerHTML = `
         <div class="widget-header">
             <h3>API Doc AI Assistant</h3>
+            <button id="expand-chat">➕</button> <!-- Updated expand icon -->
             <button id="minimize-chat">−</button>
         </div>
         <div class="chat-container">
             <div id="chat-messages"></div>
+            <div id="search-log"></div> <!-- Added search log container -->
             <div class="input-container">
                 <textarea id="user-input" placeholder="Ask a question about the API..."></textarea>
-                <button id="send-message">Send</button>
+                <button id="send-message">➡️</button> <!-- Updated send button to arrow -->
             </div>
         </div>
     `;
@@ -61,6 +63,7 @@ function initializeChat() {
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-message');
     const minimizeButton = document.getElementById('minimize-chat');
+    const expandButton = document.getElementById('expand-chat');
     
     let conversationHistory = [];
 
@@ -76,6 +79,12 @@ function initializeChat() {
         }
     });
 
+    // Handle expand
+    expandButton.addEventListener('click', () => {
+        const widget = document.getElementById('api-doc-ai-widget');
+        widget.classList.toggle('expanded');
+    });
+
     // Handle sending messages
     async function sendMessage() {
         const message = userInput.value.trim();
@@ -87,6 +96,26 @@ function initializeChat() {
         // Add user message to chat
         addMessageToChat('user', message);
         userInput.value = '';
+
+        // Keep the widget expanded
+        const widget = document.getElementById('api-doc-ai-widget');
+        widget.classList.add('expanded'); // Ensure it stays expanded
+
+        // Log the search activity in chat messages
+        addMessageToChat('assistant', 'Searching the Firebase API documentation...'); // Initial log message
+
+        // Simulate reasoning steps
+        const reasoningSteps = [
+            "Looking up the Firebase API...",
+            "Retrieving relevant documentation...",
+            "Analyzing the response...",
+            "Preparing the answer..."
+        ];
+
+        for (const step of reasoningSteps) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Delay each step by 1 second
+            addMessageToChat('assistant', step); // Log each step as an assistant message
+        }
 
         try {
             const response = await fetch('http://localhost:8000/chat', {
@@ -148,11 +177,19 @@ function initializeChat() {
         });
     }
 
-    sendButton.addEventListener('click', sendMessage);
+    sendButton.addEventListener('click', () => {
+        const message = userInput.value;
+        if (message) {
+            sendMessage();
+        }
+    });
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            sendMessage();
+            const message = userInput.value;
+            if (message) {
+                sendMessage();
+            }
         }
     });
 

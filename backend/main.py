@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import openai
-import pinecone
+from pinecone import Pinecone, ServerlessSpec
 import os
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
@@ -43,13 +43,37 @@ if not all([PINECONE_API_KEY, PINECONE_ENV, PINECONE_INDEX]):
     )
 
 try:
-    pinecone.init(
+    print("Initializing Pinecone...")
+    pc = Pinecone(
         api_key=PINECONE_API_KEY,
         environment=PINECONE_ENV
     )
-    index = pinecone.Index(PINECONE_INDEX)
+    print("Pinecone client created successfully.")
+
+    # Check if index exists, create if not
+    existing_indexes = pc.list_indexes().names()
+    if PINECONE_INDEX not in existing_indexes:
+        print(f"Index '{PINECONE_INDEX}' not found. Creating...")
+        pc.create_index(
+            name=PINECONE_INDEX,
+            dimension=1536,
+            metric='cosine',  # or "euclidean", depending on your use case
+            spec=ServerlessSpec(
+                cloud='aws',        # or "gcp"
+                region=PINECONE_ENV
+            )
+        )
+        print(f"Index '{PINECONE_INDEX}' created successfully.")
+
+    # Connect to the index
+    print(f"Connecting to index: {PINECONE_INDEX}")
+    index = pc.Index(PINECONE_INDEX)
+    print("Connected to index successfully.")
+    
     # Test the connection
-    index.describe_index_stats()
+    print("Testing connection with describe_index_stats...")
+    stats = index.describe_index_stats()
+    print(f"Index stats: {stats}")
 except Exception as e:
     print(f"Error initializing Pinecone: {str(e)}")
     raise ValueError(
