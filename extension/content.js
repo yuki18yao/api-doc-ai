@@ -79,7 +79,10 @@ function initializeChat() {
     // Handle sending messages
     async function sendMessage() {
         const message = userInput.value.trim();
-        if (!message) return;
+        if (!message) {
+            addMessageToChat('assistant', 'Please enter a question.');
+            return;
+        }
 
         // Add user message to chat
         addMessageToChat('user', message);
@@ -93,21 +96,32 @@ function initializeChat() {
                 },
                 body: JSON.stringify({
                     question: message,
-                    context: document.body.innerText,
                     conversation_history: conversationHistory
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`Server error: ${JSON.stringify(errorData)}`);
+            let data;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                throw new Error('Received non-JSON response from server');
             }
-            const data = await response.json();
+
+            if (!response.ok) {
+                const errorDetail = typeof data.detail === 'object' ? JSON.stringify(data.detail) : data.detail;
+                throw new Error(errorDetail || 'Failed to get response from server');
+            }
+
+            if (!data.response) {
+                throw new Error('No response received from server');
+            }
+
             addMessageToChat('assistant', data.response);
         } catch (error) {
-            const errorMessage = `Error: ${error.message}`;
+            console.error('Chat error:', error);
+            const errorMessage = error.message || 'Sorry, I encountered an error. Please try again.';
             addMessageToChat('assistant', errorMessage);
-            console.error('Error:', error);
         }
     }
 
@@ -116,9 +130,12 @@ function initializeChat() {
         messageDiv.className = `message ${role}-message`;
         
         // For code snippets, wrap them in pre and code tags
-        const formattedContent = content.replace(/```([\s\S]*?)```/g, (match, code) => {
-            return `<pre><code>${code}</code></pre>`;
-        });
+        let formattedContent = content;
+        if (typeof content === 'string') {
+            formattedContent = content.replace(/```([\s\S]*?)```/g, (match, code) => {
+                return `<pre><code>${code}</code></pre>`;
+            });
+        }
         
         messageDiv.innerHTML = formattedContent;
         chatMessages.appendChild(messageDiv);
@@ -146,7 +163,7 @@ function initializeChat() {
 // Process the current page
 async function processCurrectPage() {
     try {
-        await fetch('http://localhost:8000/process-documentation', {
+        const response = await fetch('http://localhost:8000/process-documentation', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -155,8 +172,18 @@ async function processCurrectPage() {
                 url: window.location.href
             })
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Error processing page:', errorData);
+            throw new Error(errorData.detail || 'Failed to process documentation');
+        }
+
+        const data = await response.json();
+        console.log('Documentation processed:', data);
     } catch (error) {
         console.error('Error processing page:', error);
+        addMessageToChat('assistant', 'Failed to process the documentation. Please try a different page or refresh.');
     }
 }
 
